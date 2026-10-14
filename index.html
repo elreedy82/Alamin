@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>New Alamein Rev B - Precision 3D CAD/BIM Model (Enlarged Master Bath)</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #0d1219; font-family: 'Segoe UI', Roboto, sans-serif; color: #fff; user-select: none; }
+    canvas { display: block; touch-action: none; }
+    #ui {
+      position: absolute; top: 14px; left: 14px; z-index: 10;
+      background: rgba(13, 18, 25, 0.92); backdrop-filter: blur(12px);
+      padding: 16px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);
+      max-width: 345px; box-shadow: 0 12px 35px rgba(0,0,0,0.65);
+    }
+    h1 { margin: 0 0 3px 0; font-size: 14.5px; font-weight: 700; letter-spacing: 0.5px; color: #e2c08d; }
+    p.sub { margin: 0 0 12px 0; font-size: 11px; color: #9aa5b1; }
+    .btn-group { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+    button {
+      flex: 1; padding: 6px 8px; font-size: 10.5px; font-weight: 600;
+      background: #1f2933; color: #e4e7eb; border: 1px solid #3e4c59;
+      border-radius: 5px; cursor: pointer; transition: all 0.18s; white-space: nowrap;
+    }
+    button:hover, button.active { background: #e2c08d; color: #0d1219; border-color: #e2c08d; }
+    .slider-panel {
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 9px; margin-top: 6px; margin-bottom: 8px;
+    }
+    .slider-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 10.5px; color: #cbd2d9; margin-bottom: 6px;
+    }
+    .slider-row label { flex: 1.1; font-weight: 600; }
+    .slider-row input[type="range"] {
+      flex: 1.3; cursor: pointer; accent-color: #e2c08d; height: 4px; margin: 0 8px;
+    }
+    .slider-row span { width: 34px; text-align: right; color: #e2c08d; font-variant-numeric: tabular-nums; }
+    .legend { font-size: 10.5px; line-height: 1.6; color: #cbd2d9; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <h1>NEW ALAMEIN | 3D BIM</h1>
+    <p class="sub">Widened Master Bath • Shower Stand • Preserved Door Position</p>
+    <div class="btn-group">
+      <button id="btnIso" class="active">3D Perspective</button>
+      <button id="btnTop">CAD Top Plan</button>
+      <button id="btnMasterBath">Master Bath Focus</button>
+    </div>
+    <div class="btn-group">
+      <button id="btnBalconies">3 Balconies</button>
+      <button id="btnWalls">Low/High Walls</button>
+      <button id="btnLabels">Toggle Labels</button>
+    </div>
+
+    <div class="slider-panel">
+      <div class="slider-row">
+        <label for="slAzimuth">Light Direction (360°)</label>
+        <input type="range" id="slAzimuth" min="0" max="360" step="1" value="45" />
+        <span id="valAzimuth">45°</span>
+      </div>
+      <div class="slider-row">
+        <label for="slElevation">Light Height Angle</label>
+        <input type="range" id="slElevation" min="10" max="88" step="1" value="58" />
+        <span id="valElevation">58°</span>
+      </div>
+      <div class="slider-row">
+        <label for="slDirInt">Sun Light Density</label>
+        <input type="range" id="slDirInt" min="0" max="3.5" step="0.05" value="1.4" />
+        <span id="valDirInt">1.40</span>
+      </div>
+      <div class="slider-row">
+        <label for="slAmbInt">Ambient Density</label>
+        <input type="range" id="slAmbInt" min="0" max="2.5" step="0.05" value="0.85" />
+        <span id="valAmbInt">0.85</span>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div><span class="dot" style="background:#7ec8e3"></span><strong>Master Bath (2-028):</strong> Widened to 2.75m + Shower Stand</div>
+      <div><span class="dot" style="background:#ffffff"></span><strong>Door Position:</strong> Kept in exact original location</div>
+      <div style="margin-top:6px; color:#e2c08d;"><strong>Left/Right Click (Drag):</strong> Rotate 3D</div>
+      <div style="color:#9aa5b1;"><strong>Middle Ball (Drag):</strong> Move/Pan | <strong>Scroll:</strong> Zoom</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d1219);
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 150);
+    camera.position.set(7.8, 17.5, 17.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    document.body.appendChild(labelRenderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(7.8, 0, 6.5);
+    controls.enableDamping = true;
+    controls.enablePan = true;
+    controls.screenSpacePanning = true;
+    controls.panSpeed = 1.2;
+
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.ROTATE
+    };
+
+    window.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); return false; }, { capture: true });
+    window.addEventListener('auxclick', (e) => { e.preventDefault(); e.stopPropagation(); return false; }, { capture: true });
+    renderer.domElement.addEventListener('mousedown', (e) => { if (e.button === 1 || e.button === 2) e.preventDefault(); }, { capture: true, passive: false });
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xfff8ef, 0.85);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.4);
+    dirLight.target.position.set(7.8, 0, 6.5);
+    scene.add(dirLight.target);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    const d = 16;
+    dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
+    scene.add(dirLight);
+
+    const slAzimuth = document.getElementById('slAzimuth');
+    const slElevation = document.getElementById('slElevation');
+    const slDirInt = document.getElementById('slDirInt');
+    const slAmbInt = document.getElementById('slAmbInt');
+
+    const valAzimuth = document.getElementById('valAzimuth');
+    const valElevation = document.getElementById('valElevation');
+    const valDirInt = document.getElementById('valDirInt');
+    const valAmbInt = document.getElementById('valAmbInt');
+
+    const updateLighting = () => {
+      const azDeg = parseFloat(slAzimuth.value);
+      const elDeg = parseFloat(slElevation.value);
+      const dirDensity = parseFloat(slDirInt.value);
+      const ambDensity = parseFloat(slAmbInt.value);
+
+      valAzimuth.textContent = `${azDeg}°`;
+      valElevation.textContent = `${elDeg}°`;
+      valDirInt.textContent = dirDensity.toFixed(2);
+      valAmbInt.textContent = ambDensity.toFixed(2);
+
+      const azRad = THREE.MathUtils.degToRad(azDeg);
+      const elRad = THREE.MathUtils.degToRad(elDeg);
+      const radius = 28;
+      const centerX = 7.8;
+      const centerZ = 6.5;
+
+      dirLight.position.set(
+        centerX + radius * Math.cos(elRad) * Math.cos(azRad),
+        radius * Math.sin(elRad),
+        centerZ + radius * Math.cos(elRad) * Math.sin(azRad)
+      );
+      dirLight.intensity = dirDensity;
+      ambientLight.intensity = ambDensity;
+    };
+
+    slAzimuth.addEventListener('input', updateLighting);
+    slElevation.addEventListener('input', updateLighting);
+    slDirInt.addEventListener('input', updateLighting);
+    slAmbInt.addEventListener('input', updateLighting);
+    updateLighting();
+
+    // Materials
+    const mats = {
+      wall: new THREE.MeshStandardMaterial({ color: 0xf2efe9, roughness: 0.5 }),
+      structural: new THREE.MeshStandardMaterial({ color: 0x8c7a6b, roughness: 0.65 }),
+      glass: new THREE.MeshPhysicalMaterial({ color: 0x7ec8e3, transparent: true, opacity: 0.38, roughness: 0.1, transmission: 0.6 }),
+      doorWood: new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.4 }),
+      doorFrame: new THREE.MeshStandardMaterial({ color: 0x4a2c11, roughness: 0.4 }),
+      swingLine: new THREE.LineBasicMaterial({ color: 0xe2c08d }),
+      travertine: new THREE.MeshStandardMaterial({ color: 0xe6dec8, roughness: 0.35 }),
+      wood: new THREE.MeshStandardMaterial({ color: 0xb58860, roughness: 0.5 }),
+      tile: new THREE.MeshStandardMaterial({ color: 0xd0d8dc, roughness: 0.25 }),
+      balcony: new THREE.MeshStandardMaterial({ color: 0x8d99ae, roughness: 0.6 }),
+      porcelain: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.12 }),
+      chrome: new THREE.MeshStandardMaterial({ color: 0xdadada, metalness: 0.9, roughness: 0.15 }),
+      counter: new THREE.MeshStandardMaterial({ color: 0xf4f3ee, roughness: 0.2 }),
+      darkMetal: new THREE.MeshStandardMaterial({ color: 0x222629, metalness: 0.7, roughness: 0.3 }),
+      planter: new THREE.MeshStandardMaterial({ color: 0xdedbd2, roughness: 0.6 }),
+      foliage: new THREE.MeshStandardMaterial({ color: 0x4f772d, roughness: 0.8 })
+    };
+
+    const wallGroup = new THREE.Group();
+    scene.add(wallGroup);
+
+    const addFloor = (x1, z1, x2, z2, mat) => {
+      const w = Math.abs(x2 - x1), d = Math.abs(z2 - z1);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), mat);
+      mesh.position.set((x1 + x2)/2, -0.06, (z1 + z2)/2);
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    };
+
+    // FLOORS
+    addFloor(0.15, 1.9, 3.65, 3.3, mats.balcony);
+    addFloor(3.95, -0.6, 7.15, 0.8, mats.balcony);
+
+    const sectorShape = new THREE.Shape();
+    sectorShape.moveTo(7.3, 4.0);
+    sectorShape.lineTo(7.3, 0.8);
+    sectorShape.absarc(7.3, 4.0, 3.2, -Math.PI/2, -0.14, false);
+    sectorShape.lineTo(8.7, 3.55);
+    sectorShape.lineTo(8.7, 4.0);
+    sectorShape.closePath();
+    const sectorGeo = new THREE.ExtrudeGeometry(sectorShape, { depth: 0.12, bevelEnabled: false });
+    sectorGeo.rotateX(Math.PI / 2);
+    const sectorMesh = new THREE.Mesh(sectorGeo, mats.balcony);
+    sectorMesh.receiveShadow = true;
+    scene.add(sectorMesh);
+
+    addFloor(0.0, 3.3, 3.8, 7.2, mats.wood);
+    // Enlarged Master Bath floor (widened to x = 2.75) and adjusted vestibule
+    addFloor(0.0, 7.2, 2.75, 9.2, mats.tile);
+    addFloor(2.75, 7.2, 3.8, 9.2, mats.wood);
+
+    addFloor(3.8, 0.8, 7.3, 5.6, mats.wood);
+    addFloor(3.8, 5.6, 5.2, 9.2, mats.travertine);
+    addFloor(5.2, 4.0, 8.7, 8.1, mats.wood);
+    addFloor(3.8, 9.2, 5.8, 12.1, mats.tile);
+    addFloor(5.2, 8.1, 8.7, 9.4, mats.travertine);
+    addFloor(5.8, 9.4, 8.7, 13.5, mats.travertine);
+    addFloor(8.7, 9.4, 12.3, 11.9, mats.tile);
+    addFloor(8.7, 11.9, 11.0, 13.5, mats.tile);
+    addFloor(8.7, 3.55, 16.0, 9.4, mats.travertine);
+    addFloor(12.3, 9.4, 16.0, 12.2, mats.wood);
+
+    // WALLS ENGINE
+    const addConnectedWall = (x1, z1, x2, z2, thick = 0.20, h = 2.7, mat = mats.wall, extendEnds = true) => {
+      const baseLen = Math.hypot(x2 - x1, z2 - z1);
+      const len = extendEnds ? baseLen + thick : baseLen;
+      const angle = Math.atan2(z2 - z1, x2 - x1);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, h, thick), mat);
+      mesh.position.set((x1 + x2)/2, h/2, (z1 + z2)/2);
+      mesh.rotation.y = -angle;
+      mesh.castShadow = mat !== mats.glass;
+      mesh.receiveShadow = true;
+      wallGroup.add(mesh);
+      return mesh;
+    };
+
+    const addStructuralBlock = (x1, z1, x2, z2, h = 2.7) => {
+      const w = Math.abs(x2 - x1), d = Math.abs(z2 - z1);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats.structural);
+      m.position.set((x1 + x2)/2, h/2, (z1 + z2)/2);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      wallGroup.add(m);
+    };
+
+    const addDoorWithSwing = (hx, hz, width, angleClosed, swingDir = 1, wallThick = 0.20) => {
+      const doorH = 2.15;
+      const headerH = 2.7 - doorH;
+      const openAngle = angleClosed + swingDir * (Math.PI * 0.42);
+
+      const endX = hx + width * Math.cos(angleClosed);
+      const endZ = hz + width * Math.sin(angleClosed);
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(width, headerH, wallThick), mats.wall);
+      lintel.position.set((hx + endX)/2, doorH + headerH/2, (hz + endZ)/2);
+      lintel.rotation.y = -angleClosed;
+      wallGroup.add(lintel);
+
+      const jambGeo = new THREE.BoxGeometry(0.05, doorH, wallThick + 0.02);
+      const j1 = new THREE.Mesh(jambGeo, mats.doorFrame);
+      j1.position.set(hx, doorH/2, hz);
+      j1.rotation.y = -angleClosed;
+      wallGroup.add(j1);
+
+      const j2 = new THREE.Mesh(jambGeo, mats.doorFrame);
+      j2.position.set(endX, doorH/2, endZ);
+      j2.rotation.y = -angleClosed;
+      wallGroup.add(j2);
+
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(width, doorH, 0.05), mats.doorWood);
+      leaf.position.set(hx + (width/2) * Math.cos(openAngle), doorH/2, hz + (width/2) * Math.sin(openAngle));
+      leaf.rotation.y = -openAngle;
+      leaf.castShadow = true;
+      scene.add(leaf);
+
+      const pts = [];
+      pts.push(new THREE.Vector3(hx, 0.03, hz));
+      const steps = 20;
+      for (let i = 0; i <= steps; i++) {
+        const a = angleClosed + swingDir * (i / steps) * (Math.PI / 2);
+        pts.push(new THREE.Vector3(hx + width * Math.cos(a), 0.03, hz + width * Math.sin(a)));
+      }
+      pts.push(new THREE.Vector3(hx, 0.03, hz));
+      const arcGeo = new THREE.BufferGeometry().setFromPoints(pts);
+      scene.add(new THREE.Line(arcGeo, mats.swingLine));
+    };
+
+    // STRUCTURAL PIERS
+    addStructuralBlock(7.10, 0.70, 7.50, 4.05);
+    addStructuralBlock(8.70, 3.55, 9.25, 3.95);
+    addStructuralBlock(15.05, 3.45, 16.10, 4.00);
+    addStructuralBlock(15.35, 11.45, 16.10, 12.30);
+    addStructuralBlock(8.55, 10.60, 8.95, 12.15);
+
+    // WALLS & DOORS
+    addConnectedWall(0.0, 3.3, 0.0, 9.2, 0.25);
+    addConnectedWall(0.0, 3.3, 0.8, 3.3, 0.25);
+    addConnectedWall(0.8, 3.3, 3.0, 3.3, 0.14, 2.7, mats.glass, false);
+    addConnectedWall(3.0, 3.3, 3.8, 3.3, 0.25);
+    addConnectedWall(0.0, 9.2, 3.8, 9.2, 0.25);
+
+    // WIDENED MASTER BATH 2-028: Door kept in exact original position (1.15 to 1.90), north wall extended to 2.75, east wall moved to 2.75
+    addConnectedWall(0.0, 7.2, 1.15, 7.2, 0.16);
+    addDoorWithSwing(1.15, 7.2, 0.75, 0, 1, 0.16);
+    addConnectedWall(1.90, 7.2, 2.75, 7.2, 0.16);
+    addConnectedWall(2.75, 7.2, 2.75, 9.2, 0.16);
+
+    // Master Bedroom Entry Door on East Wall (hx=3.8, hz=7.4, width=0.90) - open door swing reaches x=2.90
+    addConnectedWall(3.8, 0.8, 3.8, 7.4, 0.22);
+    addDoorWithSwing(3.8, 7.4, 0.90, Math.PI/2, 1, 0.22);
+    addConnectedWall(3.8, 8.3, 3.8, 9.2, 0.22);
+
+    addConnectedWall(3.8, 0.8, 4.5, 0.8, 0.25);
+    addConnectedWall(4.5, 0.8, 6.6, 0.8, 0.14, 2.7, mats.glass, false);
+    addConnectedWall(6.6, 0.8, 7.3, 0.8, 0.25);
+    addConnectedWall(3.8, 5.6, 4.1, 5.6, 0.18);
+    addDoorWithSwing(4.1, 5.6, 0.90, 0, -1, 0.18);
+    addConnectedWall(5.0, 5.6, 5.2, 5.6, 0.18);
+
+    addConnectedWall(5.2, 4.0, 7.5, 4.0, 0.22);
+    addConnectedWall(5.2, 4.0, 5.2, 7.0, 0.18);
+    addDoorWithSwing(5.2, 7.0, 0.90, Math.PI/2, -1, 0.18);
+    addConnectedWall(5.2, 7.9, 5.2, 8.1, 0.18);
+    addConnectedWall(5.2, 8.1, 8.7, 8.1, 0.18);
+    addConnectedWall(8.7, 4.0, 8.7, 8.1, 0.18);
+
+    addDoorWithSwing(7.5, 4.0, 0.95, 0, -1, 0.22);
+    addConnectedWall(8.45, 4.0, 8.7, 4.0, 0.22);
+    addConnectedWall(8.7, 3.55, 8.7, 4.0, 0.22);
+
+    // Big Bathroom 2-033 Walls
+    addConnectedWall(3.8, 9.2, 3.95, 9.2, 0.18);
+    addDoorWithSwing(3.95, 9.2, 0.80, 0, 1, 0.18);
+    addConnectedWall(4.75, 9.2, 5.8, 9.2, 0.18);
+    addConnectedWall(3.8, 9.2, 3.8, 12.1, 0.25);
+    addConnectedWall(3.8, 12.1, 5.8, 12.1, 0.25);
+
+    addConnectedWall(5.8, 9.2, 5.8, 12.25, 0.22);
+    addDoorWithSwing(5.8, 13.30, 1.05, -Math.PI/2, 1, 0.25);
+    addConnectedWall(5.8, 13.30, 5.8, 13.5, 0.25);
+    addConnectedWall(5.8, 13.5, 11.0, 13.5, 0.28);
+
+    addConnectedWall(8.7, 9.4, 8.7, 9.75, 0.18);
+    addDoorWithSwing(8.7, 9.75, 0.85, Math.PI/2, -1, 0.18);
+    addDoorWithSwing(8.7, 12.15, 0.75, Math.PI/2, -1, 0.18);
+    addConnectedWall(8.7, 12.90, 8.7, 13.5, 0.18);
+
+    addConnectedWall(8.7, 9.4, 12.3, 9.4, 0.18);
+    addConnectedWall(8.7, 11.9, 12.3, 11.9, 0.18);
+    addConnectedWall(12.3, 9.4, 12.3, 12.2, 0.18);
+    addConnectedWall(11.0, 11.9, 11.0, 13.5, 0.25);
+
+    addConnectedWall(9.25, 3.55, 13.0, 3.55, 0.25);
+    addConnectedWall(13.0, 3.55, 15.05, 3.55, 0.15, 2.7, mats.glass, false);
+    addConnectedWall(16.0, 4.0, 16.0, 11.45, 0.28);
+    addConnectedWall(12.3, 12.2, 15.35, 12.2, 0.25);
+
+    addConnectedWall(12.3, 9.4, 14.7, 9.4, 0.18);
+    addDoorWithSwing(15.6, 9.4, 0.90, Math.PI, 1, 0.18);
+    addConnectedWall(15.6, 9.4, 16.0, 9.4, 0.18);
+
+    // BALCONIES
+    const addBox = (x, y, z, w, h, d, mat, rotY = 0) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(x, y + h/2, z);
+      m.rotation.y = rotY;
+      m.castShadow = true;
+      m.receiveShadow = true;
+      scene.add(m);
+      return m;
+    };
+
+    const addBalconyPier = (cx, cz) => {
+      addBox(cx, 0, cz, 0.55, 1.1, 0.55, mats.planter);
+      addBox(cx, 0.95, cz, 0.36, 0.25, 0.36, mats.foliage);
+    };
+
+    addConnectedWall(0.15, 1.9, 0.15, 3.3, 0.18, 1.05, mats.wall);
+    addConnectedWall(3.65, 1.9, 3.65, 3.3, 0.18, 1.05, mats.wall);
+    addConnectedWall(0.15, 1.9, 3.65, 1.9, 0.10, 1.05, mats.glass);
+    addBalconyPier(0.65, 2.5);
+    addBalconyPier(3.15, 2.5);
+
+    addConnectedWall(3.95, -0.6, 3.95, 0.8, 0.18, 1.05, mats.wall);
+    addConnectedWall(7.15, -0.6, 7.15, 0.8, 0.18, 1.05, mats.wall);
+    addConnectedWall(3.95, -0.6, 7.15, -0.6, 0.10, 1.05, mats.glass);
+    addBalconyPier(4.45, 0.0);
+    addBalconyPier(6.65, 0.0);
+
+    const segs = 16;
+    for (let i = 0; i < segs; i++) {
+      const a1 = -Math.PI/2 + (i / segs) * (Math.PI/2 - 0.14);
+      const a2 = -Math.PI/2 + ((i + 1) / segs) * (Math.PI/2 - 0.14);
+      const x1 = 7.3 + 3.2 * Math.cos(a1), z1 = 4.0 + 3.2 * Math.sin(a1);
+      const x2 = 7.3 + 3.2 * Math.cos(a2), z2 = 4.0 + 3.2 * Math.sin(a2);
+      addConnectedWall(x1, z1, x2, z2, 0.08, 1.05, mats.glass, false);
+      if (i % 2 === 0) addBox(x1, 0, z1, 0.10, 1.12, 0.10, mats.darkMetal);
+    }
+
+    // --- BATHROOM DETAILS ---
+    // 1. WIDENED MASTER BEDROOM BATHROOM (2-028): Walk-In Glass Shower Stand + Basin + WC
+    // Vanity Counter & Basin (placed comfortably along the new right side of Master Bath)
+    addBox(2.35, 0, 7.65, 0.70, 0.82, 0.75, mats.counter);
+    const masterSink = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.16, 0.11, 24), mats.porcelain);
+    masterSink.position.set(2.35, 0.85, 7.65);
+    const masterTap = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 12), mats.chrome);
+    masterTap.position.set(2.35, 0.91, 7.45);
+    scene.add(masterSink, masterTap);
+
+    // Wall-Hung WC (Bottom Right of Master Bath)
+    const masterTank = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.45, 0.18), mats.porcelain);
+    masterTank.position.set(2.35, 0.62, 8.90);
+    const masterBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.38, 20), mats.porcelain);
+    masterBowl.scale.set(1, 1, 1.35);
+    masterBowl.position.set(2.35, 0.20, 8.65);
+    scene.add(masterTank, masterBowl);
+
+    // Walk-In Glass Shower Stand (Left side of Master Bath)
+    addBox(0.85, 0, 8.20, 0.04, 2.10, 1.40, mats.glass);
+    addBox(0.45, 0, 8.20, 0.80, 0.04, 1.40, mats.tile);
+    const mShowerPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.0, 12), mats.chrome);
+    mShowerPipe.position.set(0.20, 1.1, 8.20);
+    const mShowerHead = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.04, 0.25), mats.chrome);
+    mShowerHead.position.set(0.20, 2.08, 8.20);
+    scene.add(mShowerPipe, mShowerHead);
+
+    // 2. BIG BATHROOM (2-033): Basin + WC Only
+    addBox(5.35, 0, 9.65, 0.70, 0.82, 0.85, mats.counter);
+    const bigSink = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.12, 24), mats.porcelain);
+    bigSink.position.set(5.35, 0.85, 9.65);
+    const bigTap = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 12), mats.chrome);
+    bigTap.position.set(5.35, 0.92, 9.50);
+    scene.add(bigSink, bigTap);
+
+    const bigTank = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.45, 0.18), mats.porcelain);
+    bigTank.position.set(4.00, 0.62, 10.65);
+    const bigBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.15, 0.42, 20), mats.porcelain);
+    bigBowl.scale.set(1, 1, 1.35);
+    bigBowl.rotation.y = Math.PI/2;
+    bigBowl.position.set(4.22, 0.21, 10.65);
+    scene.add(bigTank, bigBowl);
+
+    // 3. GUEST TOILET (2-039): Basin + WC Only
+    addBox(9.75, 0, 13.15, 0.85, 0.82, 0.48, mats.counter);
+    const smallSink = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.10, 24), mats.porcelain);
+    smallSink.position.set(9.75, 0.85, 13.15);
+    const smallTap = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 12), mats.chrome);
+    smallTap.position.set(9.75, 0.91, 13.32);
+    scene.add(smallSink, smallTap);
+
+    const smallTank = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.40), mats.porcelain);
+    smallTank.position.set(10.75, 0.62, 12.35);
+    const smallBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.38, 20), mats.porcelain);
+    smallBowl.scale.set(1.35, 1, 1);
+    smallBowl.rotation.y = -Math.PI/2;
+    smallBowl.position.set(10.50, 0.20, 12.35);
+    scene.add(smallTank, smallBowl);
+
+    // LABELS
+    const labels = [];
+    const addLabel = (title, sub, x, z) => {
+      const div = document.createElement('div');
+      div.style.background = 'rgba(13, 18, 25, 0.86)';
+      div.style.color = '#fff';
+      div.style.padding = '3px 7px';
+      div.style.borderRadius = '4px';
+      div.style.fontSize = '10px';
+      div.style.border = '1px solid rgba(226,192,141,0.5)';
+      div.style.textAlign = 'center';
+      div.innerHTML = `<strong>${title}</strong><br><span style="font-size:8.5px;color:#e2c08d">${sub}</span>`;
+      const l = new CSS2DObject(div);
+      l.position.set(x, 1.3, z);
+      scene.add(l);
+      labels.push(l);
+    };
+
+    addLabel('MAIN ENTRANCE', 'Lobby 2-034', 7.2, 11.5);
+    addLabel('BATHROOM 2-033', 'Basin + WC Only', 4.8, 10.7);
+    addLabel('MASTER BATH 2-028', '2750mm Widened En-Suite', 1.35, 8.2);
+    addLabel('TOILET 2-039', 'Basin + WC Only', 9.8, 12.7);
+    addLabel('KITCHEN 2-038', '2500mm Width', 10.5, 10.6);
+    addLabel('MASTER 2-029', '3800×3900 + Balcony', 1.9, 5.1);
+    addLabel('BEDROOM 2-030', '3500×4800 + Balcony', 5.5, 2.8);
+    addLabel('BEDROOM 2-031', '3500×4100', 6.9, 5.8);
+    addLabel('TERRACE 2-098', 'Circular Sector Deck', 8.8, 2.4);
+    addLabel('LIVING ROOM 2-035', '7300×5850', 12.4, 6.2);
+    addLabel('BEDROOM NEW', 'Added 4th Room', 14.1, 10.8);
+
+    // UI Controls
+    let lowWalls = false;
+    document.getElementById('btnWalls').onclick = () => {
+      lowWalls = !lowWalls;
+      wallGroup.scale.y = lowWalls ? 0.32 : 1.0;
+    };
+
+    let showLabels = true;
+    document.getElementById('btnLabels').onclick = () => {
+      showLabels = !showLabels;
+      labels.forEach(l => l.visible = showLabels);
+    };
+
+    document.getElementById('btnIso').onclick = () => {
+      camera.position.set(7.8, 17.5, 17.5);
+      controls.target.set(7.8, 0, 6.5);
+    };
+    document.getElementById('btnTop').onclick = () => {
+      camera.position.set(7.8, 24, 6.5);
+      controls.target.set(7.8, 0, 6.5);
+    };
+    document.getElementById('btnMasterBath').onclick = () => {
+      camera.position.set(1.4, 6.0, 11.5);
+      controls.target.set(1.4, 0.5, 8.2);
+    };
+    document.getElementById('btnBalconies').onclick = () => {
+      camera.position.set(5.5, 10.0, -5.5);
+      controls.target.set(5.8, 0.5, 2.5);
+    };
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
